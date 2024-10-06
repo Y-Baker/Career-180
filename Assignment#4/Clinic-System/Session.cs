@@ -51,6 +51,7 @@ internal class Session
 
     public bool Login()
     {
+        
         if (this.IsRemembered && DateTime.Now - this.LoginTime < TimeSpan.FromDays(30))
         {
             IsLoggedIn = true;
@@ -60,13 +61,19 @@ internal class Session
         else
         {
             string password;
+            Interrupt interrupt;
             int attempts = 0;
             do
             {
                 Console.Write("Enter your password: ");
-                password = StdinService.ReadPassword();
+                interrupt = StdinService.ReadPassword(out password);
+                if (interrupt == Interrupt.Back)
+                    return false;
+                if (interrupt == Interrupt.Empty)
+                    continue;
                 attempts++;
-            } while (!Account.Login(password) && attempts <= 3);
+            } while (!Account.Login(password) && attempts < 3);
+    
             if (Account.Login(password))
             {
                 IsLoggedIn = true;
@@ -75,6 +82,7 @@ internal class Session
                 return true;
             }
             Console.WriteLine("Too many attempts");
+            Logout(true);
             return false;
         }
     }

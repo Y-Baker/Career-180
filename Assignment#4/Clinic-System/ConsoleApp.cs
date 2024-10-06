@@ -2,35 +2,129 @@ namespace ClinicSystem;
 
 internal class ConsoleApp
 {
-    internal void Run(bool firstTime=false)
+    private Stack<Action> actions = new Stack<Action>();
+
+    internal void Run()
     {
-        if (firstTime)
-            Console.WriteLine("Welcome to Clinic System!");
+        Console.Clear();
+        StdinService.Decorate("Welcome to Clinic System!");
+
         Console.WriteLine("1. Login");
         Console.WriteLine("2. Register");
-        Console.WriteLine("3. Exit");
+        Console.WriteLine("3. Switch User");
+        Console.WriteLine("4. Exit");
+        Console.WriteLine();
         Console.Write("Choose an option: ");
-        string option = Console.ReadLine()!;
+
+        Interrupt interrupt = StdinService.ReadInputWithShortcut(out string option);
+        HandleInterrupt(interrupt);        
+
         switch (option)
         {
             case "1":
+                PushToStack(Login);
                 Login();
                 break;
             case "2":
+                PushToStack(Register);
                 Register();
                 break;
             case "3":
+                // PushToStack(SwitchUser);
+                // SwitchSession();
+                break;
+            case "4":
                 Environment.Exit(0);
                 break;
             default:
                 Console.WriteLine("Invalid option!");
+                Thread.Sleep(1000);
+                Run();
                 break;
         }
 
-        Start();
+        // Start();
     }
 
-    internal void Start()
+
+    internal void Login()
+    {
+        Console.Clear();
+        StdinService.Decorate("Login Screen");
+        Session? session = Session.GetCurrentSession();
+        if (session is null)
+        {
+            Session? newSession;
+            int attempts = 0;
+            do
+            {
+                ReadLogin(out string username, out string password, out bool isRemembered);
+                newSession = Session.CreateSession(username, password, isRemembered);
+                attempts++;
+            } while (newSession is null && attempts < 3);
+            if (newSession is null)
+            {
+                Console.WriteLine("Login failed");
+                Thread.Sleep(1000);
+                PushToStack(Run);
+                Run();
+            } 
+            else
+                Console.WriteLine("Login successful");
+        }
+        else // todo: add username in the top right corner
+        {
+            if (session.Login())
+                Console.WriteLine("Login successful");
+            else
+            {
+                Console.WriteLine("Login failed");
+                Thread.Sleep(1000);
+                PushToStack(Run);
+                Run();
+            }
+              
+        }
+
+        PushToStack(MainMenu);
+        MainMenu();
+    }
+
+    internal void Register()
+    {
+        Console.Clear();
+        StdinService.Decorate("Register Screen");
+
+        Console.WriteLine("1. Doctor");
+        Console.WriteLine("2. Assistant");
+        Console.WriteLine();
+        Console.Write("Choose an option: ");
+
+        Interrupt interrupt = StdinService.ReadInputWithShortcut(out string option);
+        HandleInterrupt(interrupt); 
+
+        switch (option)
+        {
+            case "1":
+                PushToStack(RegisterDoctor);
+                RegisterDoctor();
+                break;
+            case "2":
+                PushToStack(RegisterAssistant);
+                RegisterAssistant();
+                break;
+            default:
+                Console.WriteLine("Invalid option!");
+                Thread.Sleep(1000);
+                Register();
+                break;
+        }
+
+        PushToStack(Login);
+        Login();
+    }
+
+    internal void MainMenu()
     {
         Session? session = Session.GetCurrentSession();
         if (session is null)
@@ -40,144 +134,146 @@ internal class ConsoleApp
             if (Authorizer.checkAuthorized(session))
             {
                 if (session.Role == Role.Doctor)
+                {
+                    PushToStack(DoctorMenu);
                     DoctorMenu();
+                }
                 else
+                {
+                    PushToStack(AssisstantMenu);
                     AssisstantMenu();
+                }
             }
             else
-                Login(session);
+                Login();
         }
-        Start();
-    }
-
-    internal void Login(Session? session = null)
-    {
-        Console.WriteLine("Login Screen");
-        if (session is null)
-        {
-            Session? newSession;
-            int attempts = 0;
-            do
-            {
-                StdinService.ReadLogin(out string username, out string password, out bool isRemembered);
-                newSession = Session.CreateSession(username, password, isRemembered);
-                attempts++;
-            } while (newSession is null && attempts < 3);
-            if (newSession is null)
-            {
-                Console.WriteLine("Login failed");
-                Run();
-            } 
-            else
-                Console.WriteLine("Login successful");
-        }
-        else
-        {
-            if (session.Login())
-                Console.WriteLine("Login successful");
-            else
-            {
-                Console.WriteLine("Login failed");
-                Run();
-            }
-              
-        }
-    }
-
-    internal void Register()
-    {
-        Console.WriteLine("Register Screen");
-        Console.WriteLine("1. Doctor");
-        Console.WriteLine("2. Assistant");
-        Console.Write("Choose an option: ");
-        string option = Console.ReadLine()!;
-        switch (option)
-        {
-            case "1":
-                RegisterDoctor();
-                break;
-            case "2":
-                RegisterAssistant();
-                break;
-            default:
-                Console.WriteLine("Invalid option!");
-                break;
-        }
+        MainMenu();
     }
 
     internal void RegisterDoctor()
     {
-        Doctor doctor = StdinService.ReadDoctor();
+        Console.Clear();
+        StdinService.Decorate("Register Doctor Screen");
+
+        Doctor doctor = ReadDoctor();
         MemoryStorage.Instance.AddDoctor(doctor);
     }
 
     internal void RegisterAssistant()
     {
-        Assistant assistant = StdinService.ReadAssistant();
+        Console.Clear();
+        StdinService.Decorate("Register Doctor Screen");
+
+        Assistant assistant = ReadAssistant();
         MemoryStorage.Instance.AddAssistant(assistant);
     }
 
     internal void DoctorMenu()
     {
-        Console.WriteLine("Main Menu");
+        string option;
+        Interrupt interrupt;
+
+        Console.Clear();
+        StdinService.Decorate("Doctor Menu");
+
         Console.WriteLine("1. View appointments");
         Console.WriteLine("2. Approve appointment");
         Console.WriteLine("3. Remove appointment");
-        Console.WriteLine("4. Logout");
+        Console.WriteLine("4. View Profile");
+        Console.WriteLine("5. Logout");
         Console.Write("Choose an option: ");
-        string option = Console.ReadLine()!;
+
+        do
+        {
+            interrupt = StdinService.ReadInputWithShortcut(out option);
+        } while (interrupt == Interrupt.Empty);
+        HandleInterrupt(interrupt);
+
         Session? session = Session.GetCurrentSession();
         if (session is null)
             Login();
+
         switch (option)
         {
             case "1":
-                ViewAppointments(session!.Account as Doctor);
+                PushToStack(ViewAppointments);
+                ViewAppointments();
                 break;
             case "2":
+                PushToStack(ApproveAppointment);
                 ApproveAppointment();
                 break;
             case "3":
+                PushToStack(RemoveAppointment);
                 RemoveAppointment();
                 break;
             case "4":
-                session!.Logout();
+                // PushToStack(ViewProfile);
+                // ViewProfile();
+                break;
+            case "5":
+                session?.Logout();
+                PushToStack(Run);
                 Run();
                 break;
             default:
                 Console.WriteLine("Invalid option!");
+                DoctorMenu();
                 break;
         }
     }
 
     internal void AssisstantMenu()
     {
-        Console.WriteLine("Main Menu");
+        string option;
+        Interrupt interrupt;
+
+        Console.Clear();
+        StdinService.Decorate("Assistant Menu");
+
         Console.WriteLine("1. View appointments");
         Console.WriteLine("2. Add appointment");
         Console.WriteLine("3. Remove appointment");
-        Console.WriteLine("4. Logout");
+        Console.WriteLine("4. View Profile");
+        Console.WriteLine("5. Logout");
         Console.Write("Choose an option: ");
-        string option = Console.ReadLine()!;
+
+        do
+        {
+            interrupt = StdinService.ReadInputWithShortcut(out option);
+        } while (interrupt == Interrupt.Empty);
+        HandleInterrupt(interrupt);
+
         Session? session = Session.GetCurrentSession();
         if (session is null)
             Login();
+
         switch (option)
         {
             case "1":
+                PushToStack(ViewAppointments);
                 ViewAppointments();
                 break;
             case "2":
+                PushToStack(AddAppointment);
                 AddAppointment();
                 break;
             case "3":
+                PushToStack(RemoveAppointment);
                 RemoveAppointment();
                 break;
             case "4":
-                session!.Logout();
+                // PushToStack(ViewProfile);
+                // ViewProfile();
+                break;
+            case "5":
+                session?.Logout();
+                PushToStack(Run);
+                Run();
                 break;
             default:
                 Console.WriteLine("Invalid option!");
+                AssisstantMenu();
                 break;
         }
     }
@@ -193,9 +289,20 @@ internal class ConsoleApp
             else
                 AssisstantMenu();
     }
-    internal void ViewAppointments(Doctor? doctor=null)
+
+    internal void ViewAppointments()
     {
-        ListAppointments(doctor);
+        Session? session = Session.GetCurrentSession();
+        if (session is null)
+            Login();
+        if (session!.Role == Role.Doctor)
+        {
+            Doctor doctor = session.Account as Doctor ?? throw new Exception("Session account is not a Doctor.");
+            ListAppointments(doctor);
+        }
+        else
+            ListAppointments();
+
         Console.WriteLine("Write Back to go back");
         if (Console.ReadLine() == "Back")
         {
@@ -386,4 +493,161 @@ internal class ConsoleApp
         }
         return true;
     }
+    
+    internal void HandleInterrupt(Interrupt interrupt)
+    {
+        switch (interrupt)
+        {
+            case Interrupt.Success:
+                break;
+            case Interrupt.Empty:
+                if (actions.Count > 0)
+                    PopFromStack();
+                else
+                    Run();
+                break;
+            case Interrupt.Back:
+                if (actions.Count > 0)
+                    PopFromStack();
+                else
+                    Run();
+                break;
+            case Interrupt.Exit:
+                Environment.Exit(0);
+                break;
+        }
+    }
+
+    internal void ReadLogin(out string username, out string password, out bool isRemembered)
+    {
+        Interrupt interrupt;
+        do
+        {
+            Console.Write("Enter your username: ");
+            interrupt = StdinService.ReadInputWithShortcut(out username);
+        } while (interrupt == Interrupt.Empty);
+        HandleInterrupt(interrupt);
+
+        do
+        {
+            Console.Write("Enter your password: ");
+            interrupt = StdinService.ReadPassword(out password);
+        } while (interrupt == Interrupt.Empty);
+        HandleInterrupt(interrupt);
+
+        Console.Write("Remember me? (y/n): ");
+        isRemembered = Console.ReadLine()!.ToLower() == "y";
+    }
+
+    internal Account ReadAccount()
+    {
+        string username, password, name, email, number, option;
+        Interrupt interrupt;
+        do
+        {
+            Console.Write("Enter your username: ");
+            interrupt = StdinService.ReadInputWithShortcut(out username);
+        } while (interrupt == Interrupt.Empty);
+        HandleInterrupt(interrupt);
+
+        do
+        {
+            Console.Write("Enter your password: ");
+            interrupt = StdinService.ReadPassword(out password);
+        } while (interrupt == Interrupt.Empty);
+        HandleInterrupt(interrupt);
+
+        do
+        {
+            Console.Write("Enter your name: ");
+            interrupt = StdinService.ReadInputWithShortcut(out name);
+        } while (interrupt == Interrupt.Empty);
+        HandleInterrupt(interrupt);
+
+        do
+        {
+            Console.Write("Enter your email: ");
+            interrupt = StdinService.ReadInputWithShortcut(out email);
+        } while (interrupt == Interrupt.Empty);
+        HandleInterrupt(interrupt);
+
+        do
+        {
+            Console.Write("Enter your number: ");
+            interrupt = StdinService.ReadInputWithShortcut(out number);
+        } while (interrupt == Interrupt.Empty);
+        HandleInterrupt(interrupt);
+
+        Console.WriteLine("Select your shift:");
+        foreach (var shiftOption in Enum.GetValues(typeof(Shift)))
+        {
+            Console.WriteLine($"{(int)shiftOption} - {shiftOption}");
+        }
+        do
+        {
+            interrupt = StdinService.ReadInputWithShortcut(out option);
+        } while (interrupt == Interrupt.Empty || !Enum.IsDefined(typeof(Shift), int.Parse(option)));
+        HandleInterrupt(interrupt);
+        Shift shift = (Shift)int.Parse(option);
+
+        return new Account(username, password, name, email, number, Shift.Morning);
+    }
+    internal Doctor ReadDoctor()
+    {
+        string option;
+        Interrupt interrupt;
+        Account account = ReadAccount();
+
+        Console.Write("Enter your department: ");
+        Console.WriteLine("Select your department:");
+        foreach (var dept in Enum.GetValues(typeof(Department)))
+        {
+            Console.WriteLine($"{(int)dept} - {dept}");
+        }
+        do
+        {
+            interrupt = StdinService.ReadInputWithShortcut(out option);
+        } while (interrupt == Interrupt.Empty || !Enum.IsDefined(typeof(Department), int.Parse(option)));
+        HandleInterrupt(interrupt);
+        Department department = (Department)int.Parse(option);
+
+        Console.WriteLine("Enter your working days (comma separated):");
+        foreach (var day in Enum.GetValues(typeof(DayOfWeek)))
+        {
+            Console.WriteLine($"{(int)day} - {day}");
+        }
+        HashSet<DayOfWeek> workingDays = new();
+        interrupt = StdinService.ReadInputWithShortcut(out string daysInput);
+        HandleInterrupt(interrupt);
+        foreach (string day in daysInput.Split(","))
+        {
+            workingDays.Add((DayOfWeek)int.Parse(day));
+        }
+
+        return new Doctor(account, department, workingDays, Auth.Partial);
+    }
+
+    internal Assistant ReadAssistant()
+    {
+        Account account = ReadAccount();
+        
+        return new Assistant(account);
+    }
+
+    internal void PushToStack(Action action)
+    {
+        actions.Push(action);
+    }
+
+    internal void PopFromStack()
+    {
+        if (actions.Count > 0)
+            actions.Pop();
+        
+        if (actions.Count > 0)
+            actions.Peek().Invoke();
+        else
+            Run();
+    }
 }
+
