@@ -1,103 +1,76 @@
 ﻿namespace ClinicSystem;
 public class StdinService
 {
-    public static string ReadPassword()
+    public static void Decorate(string message, ConsoleColor background = ConsoleColor.DarkBlue, ConsoleColor color = ConsoleColor.White)
     {
-        string password = "";
+        Console.ForegroundColor = color;
+        Console.BackgroundColor = background;
+        Console.SetCursorPosition((Console.WindowWidth - message.Length) / 2, Console.CursorTop);
+
+        Console.WriteLine($" {message} \n");
+
+        Console.ResetColor();
+    }
+    public static Interrupt ReadInputWithShortcut(out string input)
+    {
+        input = "";
         ConsoleKeyInfo key;
         do
         {
             key = Console.ReadKey(true);
+            if (key.Key == ConsoleKey.Escape)
+            {
+                input = "";
+                return Interrupt.Back;
+            }
+            else if (key.Key == ConsoleKey.Backspace && input.Length > 0)
+            {
+                input = input[0..^1];
+                Console.Write("\b \b");
+            }
+            else if (key.Key != ConsoleKey.Enter)
+            {
+                input += key.KeyChar;
+                Console.Write(key.KeyChar);
+            }
+        } while (key.Key != ConsoleKey.Enter);
+        Console.WriteLine();
+        if (input == "")
+        {
+            return Interrupt.Empty;
+        }
+        return Interrupt.Success;
+    }
 
-            if (key.Key != ConsoleKey.Backspace && key.Key != ConsoleKey.Enter)
+    public static Interrupt ReadPassword(out string password)
+    {
+        password = "";
+        ConsoleKeyInfo key;
+        do
+        {
+            key = Console.ReadKey(true);
+            if (key.Key == ConsoleKey.Escape)
+            {
+                password = "";
+                return Interrupt.Back;
+            }
+            else if (key.Key != ConsoleKey.Backspace && key.Key != ConsoleKey.Enter)
             {
                 password += key.KeyChar;
                 Console.Write("*");
             }
-            else
+            else if (key.Key == ConsoleKey.Backspace && password.Length > 0)
             {
-                if (key.Key == ConsoleKey.Backspace && password.Length > 0)
-                {
-                    password = password[0..^1];
-                    Console.Write("\b \b");
-                }
+                password = password[0..^1];
+                Console.Write("\b \b");
             }
         } while (key.Key != ConsoleKey.Enter);
         Console.WriteLine();
-        return password;
-    }
-
-    public static void ReadLogin(out string username, out string password, out bool isRemembered)
-    {
-        Console.Write("Enter your username: ");
-        username = Console.ReadLine()!;
-        Console.Write("Enter your password: ");
-        password = ReadPassword();
-        Console.Write("Remember me? (y/n): ");
-        isRemembered = Console.ReadLine()!.ToLower() == "y";
-    }
-
-    public static Doctor ReadDoctor()
-    {
-        Console.Write("Enter your username: ");
-        string username = Console.ReadLine()!;
-        Console.Write("Enter your password: ");
-        string password = ReadPassword();
-        Console.Write("Enter your name: ");
-        string name = Console.ReadLine()!;
-        Console.Write("Enter your email: ");
-        string email = Console.ReadLine()!;
-        Console.Write("Enter your number: ");
-        string number = Console.ReadLine()!;
-        Console.Write("Enter your department: ");
-        Console.WriteLine("Select your department:");
-        foreach (var dept in Enum.GetValues(typeof(Department)))
+        if (password == "")
         {
-            Console.WriteLine($"{(int)dept} - {dept}");
+            return Interrupt.Empty;
         }
-        Department department = (Department)int.Parse(Console.ReadLine()!);
-
-        Console.WriteLine("Enter your working days (comma separated):");
-        foreach (var day in Enum.GetValues(typeof(DayOfWeek)))
-        {
-            Console.WriteLine($"{(int)day} - {day}");
-        }
-        HashSet<DayOfWeek> workingDays = new();
-        foreach (string day in Console.ReadLine()!.Split(","))
-        {
-            workingDays.Add((DayOfWeek)int.Parse(day));
-        }
-
-        Console.WriteLine("Select your shift:");
-        foreach (var shiftOption in Enum.GetValues(typeof(Shift)))
-        {
-            Console.WriteLine($"{(int)shiftOption} - {shiftOption}");
-        }
-        Shift shift = (Shift)int.Parse(Console.ReadLine()!);
-
-        return new Doctor(username, password, name, email, number, department, workingDays, Auth.Partial, shift);
-    }
-
-    public static Assistant ReadAssistant()
-    {
-        Console.Write("Enter your username: ");
-        string username = Console.ReadLine()!;
-        Console.Write("Enter your password: ");
-        string password = ReadPassword();
-        Console.Write("Enter your name: ");
-        string name = Console.ReadLine()!;
-        Console.Write("Enter your email: ");
-        string email = Console.ReadLine()!;
-        Console.Write("Enter your number: ");
-        string number = Console.ReadLine()!;
-        Console.WriteLine("Select your shift:");
-        foreach (var shiftOption in Enum.GetValues(typeof(Shift)))
-        {
-            Console.WriteLine($"{(int)shiftOption} - {shiftOption}");
-        }
-        Shift shift = (Shift)int.Parse(Console.ReadLine()!);
-
-        return new Assistant(username, password, name, email, number, shift);
+        return Interrupt.Success;
     }
 
     public static Patient ReadPatient()
