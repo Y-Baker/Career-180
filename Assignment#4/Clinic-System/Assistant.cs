@@ -4,8 +4,15 @@ public class Assistant : Account
 {
     public Auth Auth { get; set; }
     public List<Patient> waitingList { get; set; }
+
     public Assistant(string username, string password, string name, string email, string number, Shift shift=Shift.Morning)
         : base(username, password, name, email, number, shift)
+    {
+        Auth = Auth.Partial;
+        waitingList = new();
+    }
+    public Assistant(Account account)
+        : base(account.Username, account.Password, account.Name ?? "", account.Email, account.Number ?? "", account.Shift)
     {
         Auth = Auth.Partial;
         waitingList = new();

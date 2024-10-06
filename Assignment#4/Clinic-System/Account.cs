@@ -1,6 +1,6 @@
 ﻿namespace ClinicSystem;
 
-public abstract class Account
+public class Account
 {
     public Guid Id { get; set; }
     public string? Name { get; set; }
@@ -10,8 +10,8 @@ public abstract class Account
     public Shift Shift { get; set; }
     public DateTime LastLogin { get; set; }
     public string Username { get; set; }
-    private string? _password;
-    public string? Password
+    private string _password;
+    public string Password
     {
         get
         {

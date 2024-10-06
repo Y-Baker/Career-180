@@ -14,6 +14,14 @@ public class Doctor : Account
         WorkingDays = workingDays;
     }
 
+    public Doctor(Account account, Department department, HashSet<DayOfWeek> workingDays, Auth auth=Auth.Partial)
+        : base(account.Username, account.Password, account.Name ?? "", account.Email, account.Number ?? "", account.Shift)
+    {
+        Department = department;
+        Auth = auth;
+        WorkingDays = workingDays;
+    }
+
     public void AddWorkingDays(DayOfWeek day)
     {
         WorkingDays.Add(day);
