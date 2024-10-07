@@ -6,12 +6,12 @@ public class Doctor : Account
     public Auth Auth { get; set; }
     public HashSet<DayOfWeek> WorkingDays { get; set; }
 
-    public Doctor(string username, string password, string name, string email, string number, Department department, HashSet<DayOfWeek> workingDays, Auth auth=Auth.Partial, Shift shift=Shift.Morning)
+    public Doctor(string username, string password, string name, string email, string number, Department department, HashSet<DayOfWeek>? workingDays=null, Auth auth=Auth.Partial, Shift shift=Shift.Morning)
         : base(username, password, name, email, number, shift)
     {
         Department = department;
         Auth = auth;
-        WorkingDays = workingDays;
+        WorkingDays = workingDays ?? new HashSet<DayOfWeek>();
     }
 
     public Doctor(Account account, Department department, HashSet<DayOfWeek> workingDays, Auth auth=Auth.Partial)
@@ -62,21 +62,28 @@ public class Doctor : Account
 
     public bool TimeIsAvailable(DateTime time)
     {
+        TimeSpan start, end;
         DayOfWeek day = time.DayOfWeek;
         if (!WorkingDays.Contains(day))
             return false;
         switch (Shift)
         {
             case Shift.Morning:
-                if (time.Hour < 9 || time.Hour >= 14)
+                start = MemoryStorage.Instance.WorkingHours[Shift.Morning].Item1;
+                end = MemoryStorage.Instance.WorkingHours[Shift.Morning].Item2;
+                if (time.TimeOfDay < start || time.TimeOfDay >= end)
                     return false;
                 break;
             case Shift.Evening:
-                if (time.Hour < 14 || time.Hour >= 19)
+                start = MemoryStorage.Instance.WorkingHours[Shift.Evening].Item1;
+                end = MemoryStorage.Instance.WorkingHours[Shift.Evening].Item2;
+                if (time.TimeOfDay < start || time.TimeOfDay >= end)
                     return false;
                 break;
             case Shift.Night:
-                if (time.Hour < 19 || time.Hour >= 24)
+                start = MemoryStorage.Instance.WorkingHours[Shift.Night].Item1;
+                end = MemoryStorage.Instance.WorkingHours[Shift.Night].Item2;
+                if (time.TimeOfDay < start || time.TimeOfDay >= end)
                     return false;
                 break;
         }

@@ -7,7 +7,7 @@ public class Patient
     public string Address { get; set; }
     public int Age { get; set; }
     public Gendre Gendre { get; set; }
-    public string History { get; set; }
+    public List<Appoiment> History { get; set; }
 
     public Patient(string name, string number, string address, int age, Gendre gendre)
     {
@@ -16,6 +16,6 @@ public class Patient
         Address = address;
         Age = age;
         Gendre = gendre;
-        History = "";
+        History = new();
     }
 }

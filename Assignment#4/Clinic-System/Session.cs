@@ -29,12 +29,12 @@ internal class Session
         Account? account = MemoryStorage.Instance.GetAccountByUsername(username);
         if (account is null)
         {
-            Console.WriteLine("Account not found");
+            StdinService.Decorate("Account not found", ConsoleColor.Red, end: "\n\n");
             return null;
         }
         if (account.Password != password)
         {
-            Console.WriteLine("Incorrect password");
+            StdinService.Decorate("Incorrect password", ConsoleColor.Red, end: "\n\n");
             return null;
         }
         Role role = MemoryStorage.Instance.GetRoleByUsername(username) ?? throw new Exception("Can't Find Role of Account");
@@ -49,9 +49,9 @@ internal class Session
         return MemoryStorage.Instance.GetSessionByToken(MemoryStorage.Instance.CurrentSessionToken);
     }
 
-    public bool Login()
+    public bool Login(out Interrupt interrupt)
     {
-        
+        interrupt = Interrupt.Success;
         if (this.IsRemembered && DateTime.Now - this.LoginTime < TimeSpan.FromDays(30))
         {
             IsLoggedIn = true;
@@ -61,7 +61,6 @@ internal class Session
         else
         {
             string password;
-            Interrupt interrupt;
             int attempts = 0;
             do
             {
@@ -81,17 +80,20 @@ internal class Session
                 MemoryStorage.Instance.SetCurrentSession(this);
                 return true;
             }
-            Console.WriteLine("Too many attempts");
-            Logout(true);
+            StdinService.Decorate("Too many attempts", ConsoleColor.Red, end: "\n\n");
+            Logout(true, true);
+            interrupt = Interrupt.Exit;
             return false;
         }
     }
 
-    public bool Logout(bool force=false)
+    public bool Logout(bool force=false, bool full=false)
     {
         if (force || Authorizer.checkAuthorized(this))
         {
             IsLoggedIn = false;
+            if (full)
+                IsRemembered = false;
             Account.Logout();
             return true;
         }

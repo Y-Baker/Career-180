@@ -1,8 +1,11 @@
-﻿namespace ClinicSystem.engine;
+﻿
+namespace ClinicSystem.engine;
 internal class MemoryStorage
 {
     private static readonly Lazy<MemoryStorage> _instance = new Lazy<MemoryStorage>(() => new MemoryStorage());
     public static MemoryStorage Instance { get { return _instance.Value; } }
+
+    public Dictionary<Shift, Tuple<TimeSpan, TimeSpan>> WorkingHours { get; set; }
     public Guid CurrentSessionToken { get; set; }
     public List<Session> Sessions { get; set; }
     public List<Doctor> Doctors { get; set; }
@@ -12,6 +15,12 @@ internal class MemoryStorage
 
     private MemoryStorage()
     {
+        WorkingHours = new Dictionary<Shift, Tuple<TimeSpan, TimeSpan>>()
+        {
+            { Shift.Morning, new Tuple<TimeSpan, TimeSpan>(new TimeSpan(8, 0, 0), new TimeSpan(14, 0, 0)) },
+            { Shift.Evening, new Tuple<TimeSpan, TimeSpan>(new TimeSpan(14, 0, 0), new TimeSpan(20, 0, 0)) },
+            { Shift.Night, new Tuple<TimeSpan, TimeSpan>(new TimeSpan(20, 0, 0), new TimeSpan(2, 0, 0)) }
+        };
         Sessions = new List<Session>();
         Doctors = new List<Doctor>();
         Assistants = new List<Assistant>();
@@ -66,6 +75,12 @@ internal class MemoryStorage
     {
         return Sessions.Find(session => session.Token.Equals(token))?.Account ?? null;
     }
+
+    public List<Doctor> GetDoctorsByDepartment(Department department)
+    {
+        return Doctors.FindAll(doctor => doctor.Department.Equals(department));
+    }
+
     public Session? GetSessionByToken(Guid token)
     {
         return Sessions.Find(session => session.Token.Equals(token)) ?? null;
@@ -111,5 +126,25 @@ internal class MemoryStorage
     public List<Appoiment> GetAppoimentsByDepartment(Department department)
     {
         return Appoiments.FindAll(appoiment => appoiment.Doctor.Department.Equals(department));
+    }
+
+    public void SetWorkingHours(IConfigurationSection workingHours)
+    {
+        string[] morning = workingHours["Morning"]!.Split('-');
+        WorkingHours[Shift.Morning] = new Tuple<TimeSpan, TimeSpan>(GetTimeSpan(morning[0].Trim()), GetTimeSpan(morning[1].Trim()));
+
+        string[] evening = workingHours["Evening"]!.Split('-');
+        WorkingHours[Shift.Evening] = new Tuple<TimeSpan, TimeSpan>(GetTimeSpan(evening[0].Trim()), GetTimeSpan(evening[1].Trim()));
+
+        string[] night = workingHours["Night"]!.Split('-');
+        WorkingHours[Shift.Night] = new Tuple<TimeSpan, TimeSpan>(GetTimeSpan(night[0].Trim()), GetTimeSpan(night[1].Trim()));
+    }
+
+    private TimeSpan GetTimeSpan(string time)
+    {
+        DateTime dateTime = DateTime.ParseExact(time, "h:mm tt", null);
+        TimeSpan timeSpan = dateTime.TimeOfDay;
+
+        return timeSpan;
     }
 }

@@ -3,5 +3,8 @@ global using System.Collections.Generic;
 global using System.Linq;
 global using System.Text;
 global using System.Threading.Tasks;
+global using System.Text.Json;
 global using ClinicSystem;
 global using ClinicSystem.engine;
+global using Microsoft.Extensions.Configuration;
+global using Microsoft.Extensions.Configuration.Json;
