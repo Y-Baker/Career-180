@@ -18,7 +18,11 @@ Doctor doctor = new(admin["username"]!,
                 );
 
 ConsoleApp app = new(doctor, config);
-StdinService.Decorate("Info: you can use `Esc` key to get back in the program at any time and `Ctrl + C` to exit the program", ConsoleColor.DarkYellow);
+StdinService.Decorate("Info: you can use", ConsoleColor.DarkYellow, end: "");
+StdinService.Decorate("`Esc`", ConsoleColor.Magenta, end: "");
+StdinService.Decorate("key to get back in the program at any time and", ConsoleColor.DarkYellow, end: "");
+StdinService.Decorate("`Ctrl + C`", ConsoleColor.Magenta, end: "");
+StdinService.Decorate("to exit the program", ConsoleColor.DarkYellow);
 Console.ReadLine();
 
 app.Run();

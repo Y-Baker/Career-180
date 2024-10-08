@@ -49,7 +49,7 @@ internal class ConsoleApp
                 Register();
                 break;
             case "3":
-                // PushToStack(SwitchUser);
+                // PushToStack(SwitchSession);
                 // SwitchSession();
                 break;
             case "4":
@@ -449,7 +449,7 @@ internal class ConsoleApp
                 break;
             attempts++;
         } while (!ValidTime(time, doctor) && attempts < 10);
-        if (attempts == 3)
+        if (attempts == 10)
         {
             Console.WriteLine();
             StdinService.Decorate("Failed to add appointment", ConsoleColor.Red);
@@ -606,6 +606,7 @@ internal class ConsoleApp
         Console.SetCursorPosition(0, Console.WindowHeight - 1);
         Console.Write("Press any key to return to the menu ");
         Console.ReadKey();
+        PushToStack(ReturnToMenu);
         ReturnToMenu();
     }
     internal Patient? ChoosePatient(out string number)
@@ -614,7 +615,7 @@ internal class ConsoleApp
 
         do
         {
-            Console.WriteLine("Enter patient Number: ");
+            Console.Write("Enter patient Number: ");
             interrupt = StdinService.ReadInputWithShortcut(out number);
         } while (interrupt == Interrupt.Empty);
         HandleInterrupt(interrupt);
@@ -711,12 +712,13 @@ internal class ConsoleApp
     }
     internal void ListAppointments(Doctor? doctor=null)
     {
-        Console.WriteLine($"{"Time",-20} {"Patient",-20} {"State",-20} {"Paid",-20} {"Price",-20}");
         if (doctor is null)
         {
             List<Appoiment> allAppoiments = MemoryStorage.Instance.Appoiments;
             if (allAppoiments.Count == 0)
                 Console.WriteLine("No Appoiments Found");
+            else
+                Console.WriteLine($"{"Time",-20} {"Patient",-20} {"State",-20} {"Paid",-20} {"Price",-20}");
             for (int i = 0; i < allAppoiments.Count; i++)
             {
                 Console.WriteLine($"{i+1}. {ViewAppointment(allAppoiments[i])}");
@@ -727,6 +729,8 @@ internal class ConsoleApp
             List<Appoiment> appoiments = MemoryStorage.Instance.GetAppoimentsByDoctor(doctor);
             if (appoiments.Count == 0)
                 Console.WriteLine("No Appoiments Found");
+            else
+                Console.WriteLine($"{"Time",-20} {"Patient",-20} {"State",-20} {"Paid",-20} {"Price",-20}");
             for (int i = 0; i < appoiments.Count; i++)
             {
                 Console.WriteLine($"{i+1}. {ViewAppointment(appoiments[i])}");
@@ -855,13 +859,13 @@ internal class ConsoleApp
         } while (interrupt == Interrupt.Empty);
         HandleInterrupt(interrupt);
 
-        Console.WriteLine("Select your shift:");
         foreach (var shiftOption in Enum.GetValues(typeof(Shift)))
         {
             Console.WriteLine($"{(int)shiftOption} - {shiftOption}");
         }
         do
         {
+            Console.WriteLine("Select your shift:");
             interrupt = StdinService.ReadInputWithShortcut(out option);
             if (interrupt == Interrupt.Back)
                 break;
@@ -877,13 +881,13 @@ internal class ConsoleApp
         Interrupt interrupt;
         Account account = ReadAccount();
 
-        Console.WriteLine("Select your department:");
         foreach (var dept in Enum.GetValues(typeof(Department)))
         {
             Console.WriteLine($"{(int)dept} - {dept}");
         }
         do
         {
+            Console.WriteLine("Select your department:");
             interrupt = StdinService.ReadInputWithShortcut(out option);
             if (interrupt == Interrupt.Back)
                 break;
@@ -891,18 +895,29 @@ internal class ConsoleApp
         HandleInterrupt(interrupt);
         Department department = (Department)int.Parse(option);
 
-        Console.WriteLine("Enter your working days (comma separated):");
         foreach (var day in Enum.GetValues(typeof(DayOfWeek)))
         {
-            Console.WriteLine($"{(int)day} - {day}");
+            Console.WriteLine($"{(int)day + 1} - {day}");
         }
         HashSet<DayOfWeek> workingDays = new();
-        interrupt = StdinService.ReadInputWithShortcut(out string daysInput);
-        HandleInterrupt(interrupt);
-        foreach (string day in daysInput.Split(","))
+        do
         {
-            workingDays.Add((DayOfWeek)int.Parse(day));
-        }
+            Console.WriteLine("Enter your working days (comma separated):");
+            interrupt = StdinService.ReadInputWithShortcut(out string daysInput);
+            HandleInterrupt(interrupt);
+            try
+            {
+                foreach (string day in daysInput.Split(","))
+                {
+                    workingDays.Add((DayOfWeek)int.Parse(day) - 1);
+                }
+            }
+            catch (Exception)
+            {
+                StdinService.Decorate("Invalid input", ConsoleColor.Red);
+                continue;
+            }
+        } while (interrupt == Interrupt.Empty || workingDays.Count == 0);
 
         return new Doctor(account, department, workingDays, Auth.Partial);
     }
