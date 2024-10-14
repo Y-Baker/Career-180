@@ -11,6 +11,9 @@
     <Reference Include="StudentService">
       <HintPath>..\StudentService\bin\Debug\net8.0\StudentService.dll</HintPath>
     </Reference>
+    <Reference Include="TimeSpan">
+      <HintPath>..\TimeSpan\bin\Debug\net8.0\TimeSpan.dll</HintPath>
+    </Reference>
   </ItemGroup>
 
 </Project>
