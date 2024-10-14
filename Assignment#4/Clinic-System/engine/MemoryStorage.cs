@@ -27,22 +27,30 @@ internal class MemoryStorage
         Patients = new List<Patient>();
         Appoiments = new List<Appoiment>();
     }
-    public void AddDoctor(Doctor doctor)
-    {
-        Doctors.Add(doctor);
-    }
-    public void AddAssistant(Assistant assistant)
-    {
-        Assistants.Add(assistant);
-    }
+
     public void AddSession(Session session)
     {
         Sessions.Add(session);
+    }
+    public Session? GetSessionByToken(Guid token)
+    {
+        return Sessions.Find(session => session.Token.Equals(token)) ?? null;
+    }
+    public Session? GetSessionByUsername(string username)
+    {
+        return Sessions.Find(session => session.Account.Username.Equals(username)) ?? null;
     }
     public void SetCurrentSession(Session session)
     {
         CurrentSessionToken = session.Token;
     }
+    public void RemoveSession(Guid token)
+    {
+        Session? session = Sessions.Find(session => session.Token.Equals(token));
+        if (session is not null)
+            Sessions.Remove(session);
+    }
+
     public Account? GetAccountByUsername(string username)
     {
         Account? account = Doctors.Cast<Account>().Concat(Assistants.Cast<Account>()).FirstOrDefault(acc => acc.Username.Equals(username));
@@ -51,6 +59,10 @@ internal class MemoryStorage
             return account;
         }
         return null;
+    }
+    public Account? GetAccountByToken(Guid token)
+    {
+        return Sessions.Find(session => session.Token.Equals(token))?.Account ?? null;
     }
     public Role? GetRoleByUsername(string username)
     {
@@ -62,67 +74,58 @@ internal class MemoryStorage
             return Role.Assistant;
         return null;
     }
-    //public Doctor? GetDoctorByUsername(string username)
-    //{
-    //    return Doctors.Find(doctor => doctor.Username.Equals(username)) ?? null;
-    //}
-    //public Assistant? GetAssistantByUsername(string username)
-    //{
-    //    return Assistants.Find(assistant => assistant.Username.Equals(username)) ?? null;
-    //}
 
-    public Account? GetAccountByToken(Guid token)
+    public void AddDoctor(Doctor doctor)
     {
-        return Sessions.Find(session => session.Token.Equals(token))?.Account ?? null;
+        Doctors.Add(doctor);
     }
-
     public List<Doctor> GetDoctorsByDepartment(Department department)
     {
         return Doctors.FindAll(doctor => doctor.Department.Equals(department));
     }
-
-    public Session? GetSessionByToken(Guid token)
+    public Doctor? GetDoctorByUsername(string username)
     {
-        return Sessions.Find(session => session.Token.Equals(token)) ?? null;
+       return Doctors.Find(doctor => doctor.Username.Equals(username)) ?? null;
     }
-    public void RemoveSession(Guid token)
+
+    public void AddAssistant(Assistant assistant)
     {
-        Session? session = Sessions.Find(session => session.Token.Equals(token));
-        if (session is not null)
-            Sessions.Remove(session);
+        Assistants.Add(assistant);
+    }
+    public Assistant? GetAssistantByUsername(string username)
+    {
+       return Assistants.Find(assistant => assistant.Username.Equals(username)) ?? null;
     }
 
     public void AddPatient(Patient patient)
     {
         Patients.Add(patient);
     }
-
     public Patient? GetPatientByNumber(string number)
     {
         return Patients.Find(patient => patient.Number.Equals(number)) ?? null;
     }
 
-
     public void AddAppoiment(Appoiment appoiment)
     {
         Appoiments.Add(appoiment);
     }
-
+    public List<Appoiment> GetAppoiments(Doctor doctor, DateOnly day)
+    {
+        return Appoiments.FindAll(appoiment => appoiment.Doctor.Equals(doctor) && DateOnly.FromDateTime(appoiment.Time.Date).Equals(day));
+    }
     public List<Appoiment> GetAppoimentsByDoctor(Doctor doctor)
     {
         return Appoiments.FindAll(appoiment => appoiment.Doctor.Equals(doctor));
     }
-
     public List<Appoiment> GetAppoimentsByPatient(Patient patient)
     {
         return Appoiments.FindAll(appoiment => appoiment.Patient.Equals(patient));
     }
-
     public List<Appoiment> GetAppoimentsByAssistant(Assistant assistant)
     {
         return Appoiments.FindAll(appoiment => appoiment.Assistant.Equals(assistant));
     }
-
     public List<Appoiment> GetAppoimentsByDepartment(Department department)
     {
         return Appoiments.FindAll(appoiment => appoiment.Doctor.Department.Equals(department));
@@ -139,7 +142,6 @@ internal class MemoryStorage
         string[] night = workingHours["Night"]!.Split('-');
         WorkingHours[Shift.Night] = new Tuple<TimeSpan, TimeSpan>(GetTimeSpan(night[0].Trim()), GetTimeSpan(night[1].Trim()));
     }
-
     private TimeSpan GetTimeSpan(string time)
     {
         DateTime dateTime = DateTime.ParseExact(time, "h:mm tt", null);

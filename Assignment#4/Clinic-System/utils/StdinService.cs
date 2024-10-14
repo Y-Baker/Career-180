@@ -35,7 +35,7 @@ public class StdinService
             key = Console.ReadKey(true);
             if (key.Key == ConsoleKey.Escape)
             {
-                input = "*";
+                input = "";
                 return Interrupt.Back;
             }
             else if (key.Key == ConsoleKey.Backspace)
@@ -54,12 +54,19 @@ public class StdinService
         Console.WriteLine();
         if (input == "")
         {
-            input = "*";
+            input = "";
             return Interrupt.Empty;
         }
         return Interrupt.Success;
     }
 
+    public static Interrupt ReadKey()
+    {
+        ConsoleKeyInfo key = Console.ReadKey(true);
+        if (key.Key == ConsoleKey.Escape)
+            return Interrupt.Back;
+        return Interrupt.Success;
+    }
     public static Interrupt ReadPassword(out string password)
     {
         password = "";

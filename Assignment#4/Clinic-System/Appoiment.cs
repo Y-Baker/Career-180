@@ -33,4 +33,13 @@ public class Appoiment
         }
         return true;
     }
+
+    public static string HeadView()
+    {
+        return $"{"Time",-30} {"Patient",-20} {"State",-20} {"Paid",-20} {"Price",-20}";
+    }
+    public string View()
+    {
+        return $"{Time,-30} {Patient.Name,-20} {State,-20} {AppoimentIsPaid,-20} {Price,-20}";
+    }
 }

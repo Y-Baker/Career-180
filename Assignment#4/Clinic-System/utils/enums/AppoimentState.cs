@@ -4,5 +4,5 @@ public enum AppoimentState
 {
     Approved,
     Pending,
-    Cancelled
+    Canceled
 }

@@ -49,6 +49,17 @@ internal class Session
         return MemoryStorage.Instance.GetSessionByToken(MemoryStorage.Instance.CurrentSessionToken);
     }
 
+    public bool Login(string password)
+    {
+        if (Account.Login(password))
+        {
+            IsLoggedIn = true;
+            UpdateLastLogin();
+            MemoryStorage.Instance.SetCurrentSession(this);
+            return true;
+        }
+        return false;
+    }
     public bool Login(out Interrupt interrupt)
     {
         interrupt = Interrupt.Success;
@@ -76,7 +87,7 @@ internal class Session
             if (Account.Login(password))
             {
                 IsLoggedIn = true;
-                LoginTime = DateTime.Now;
+                UpdateLastLogin();
                 MemoryStorage.Instance.SetCurrentSession(this);
                 return true;
             }
@@ -89,6 +100,7 @@ internal class Session
 
     public bool Logout(bool force=false, bool full=false)
     {
+        UpdateLastActionTime();
         if (force || Authorizer.checkAuthorized(this))
         {
             IsLoggedIn = false;
@@ -100,21 +112,31 @@ internal class Session
         return false;
     }
 
+    public void UpdateLastLogin()
+    {
+        UpdateLastActionTime();
+        LoginTime = DateTime.Now;
+    }
     public void UpdateLastActionTime()
     {
         LastActionTime = DateTime.Now;
     }
 
-    public void SwitchSession()
-    {
-        IsLoggedIn = false;
-    }
-
     public void CheckSession()
     {
+        UpdateLastActionTime();
         if (DateTime.Now - LastActionTime > TimeSpan.FromHours(8))
         {
             Logout(true);
         }
+    }
+
+    public static string HeadView()
+    {
+        return $"{"Username",-20} {"Name",-20} {"Role",-20} {"Last Login",-30} {"Last Action",-30} {"Is Remembered",-20}";
+    }
+    public string View()
+    {
+        return $"{Account.Username,-20} {Account.Name,-20} {Role,-20} {LoginTime,-30} {LastActionTime,-30} {IsRemembered,-20}";
     }
 }

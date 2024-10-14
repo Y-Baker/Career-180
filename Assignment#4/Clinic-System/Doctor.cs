@@ -22,23 +22,29 @@ public class Doctor : Account
         WorkingDays = workingDays;
     }
 
+    public string DisplayInfo()
+    {
+        List<string> days_3_letter = new List<string>();
+        foreach (DayOfWeek day in WorkingDays)
+            days_3_letter.Add(day.ToString().Substring(0, 3));
+
+        string workingDays = string.Join(", ", days_3_letter);
+        return $"{Name} - {Shift} - {workingDays}";
+    }
     public void AddWorkingDays(DayOfWeek day)
     {
         WorkingDays.Add(day);
-        // todo: save to storage
     }
 
     public void RemoveWorkingDays(DayOfWeek day)
     {
         WorkingDays.Remove(day);
-        // todo: save to storage
     }
 
     public void UpdateWorkingDays(DayOfWeek oldDay, DayOfWeek newDay)
     {
         WorkingDays.Remove(oldDay);
         WorkingDays.Add(newDay);
-        // todo: save to storage
     }
 
     public bool GrantAccess(Doctor doctor)
@@ -49,15 +55,15 @@ public class Doctor : Account
             return false;
         }
         doctor.Auth = Auth.Full;
-        // todo: save to storage
         return true;
     }
 
-    public void GetSchedules()
+    public List<Appoiment> GetSchedules(DateOnly day)
     {
         if (!Authorizer.checkAuthorized(this))
-            return;
-        Console.WriteLine("Schedules");
+            return new();
+        List<Appoiment> appoiments = MemoryStorage.Instance.GetAppoiments(this, day);
+        return appoiments.Where(appoiment => appoiment.State != AppoimentState.Canceled).ToList();
     }
 
     public bool TimeIsAvailable(DateTime time)

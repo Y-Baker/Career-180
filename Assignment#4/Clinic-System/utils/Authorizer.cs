@@ -11,16 +11,13 @@ internal class Authorizer
             return true;
         }
         else
-        {
-            Console.WriteLine("You are not logged in");
             return false;
-        }
     }
 
     public static bool checkAuthorized(Account account)
     {
         Session? session =  Session.GetCurrentSession();
-        if (session is null)
+        if (session is null || !session.IsLoggedIn)
         {
             Console.WriteLine("You need to login first");
             return false;

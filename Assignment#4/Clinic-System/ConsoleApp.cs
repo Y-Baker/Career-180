@@ -1,5 +1,6 @@
 namespace ClinicSystem;
 
+using System.Reflection.Metadata;
 using System.Runtime.InteropServices;
 using Microsoft.Extensions.Configuration;
 
@@ -17,8 +18,11 @@ internal class ConsoleApp
         if (workingHours is not null)
             MemoryStorage.Instance.SetWorkingHours(workingHours);
     }
-    internal void Run()
+
+    internal void Run(bool save=false)
     {
+        if (save)
+            PushToStack(() => Run());
         string option;
         Interrupt interrupt;
 
@@ -35,56 +39,64 @@ internal class ConsoleApp
         {
             Console.Write("Choose an option: ");
             interrupt = StdinService.ReadInputWithShortcut(out option);
-        } while (interrupt == Interrupt.Empty);
-        HandleInterrupt(interrupt);        
+            if (interrupt == Interrupt.Empty)
+                continue;
+            HandleInterrupt(interrupt);
+        } while (!int.TryParse(option, out _)); 
 
         switch (option)
         {
             case "1":
-                PushToStack(Login);
-                Login();
+                Login(true, true);
                 break;
             case "2":
-                PushToStack(Register);
-                Register();
+                Register(true);
                 break;
             case "3":
-                // PushToStack(SwitchSession);
-                // SwitchSession();
+                SwitchSession(true);
                 break;
             case "4":
                 Environment.Exit(0);
                 break;
             default:
-                Console.WriteLine("Invalid option!");
-                Console.ReadKey();
+                StdinService.Decorate("Invalid option", ConsoleColor.DarkYellow);
+                HandleInterrupt(StdinService.ReadKey());
                 Run();
                 break;
         }
     }
 
-
-    internal void Login()
+    internal void Login(bool force=false, bool save=false)
     {
+        if (save)
+            PushToStack(() => Login(force));
+
         Console.Clear();
         StdinService.Decorate("Login Screen", ConsoleColor.White, ConsoleColor.DarkBlue, position: Position.Center, end: "\n\n");
         Session? session = Session.GetCurrentSession();
-        if (session is null)
+        if (force || session is null || !Authorizer.checkAuthorized(session))
         {
             Session? newSession;
             int attempts = 0;
             do
             {
                 ReadLogin(out string username, out string password, out bool isRemembered);
-                // todo: add session to the memory storage and don't create a new one if it's already exists
-                newSession = Session.CreateSession(username, password, isRemembered);
+                newSession = MemoryStorage.Instance.GetSessionByUsername(username);
+                if (newSession is not null)
+                {
+                    if (newSession.Login(password))
+                        newSession.IsRemembered = isRemembered;
+                    else
+                        newSession = null;
+                }
+                else
+                    newSession = Session.CreateSession(username, password, isRemembered);
                 attempts++;
             } while (newSession is null && attempts < 3);
             if (newSession is null)
             {
                 StdinService.Decorate("Login failed", ConsoleColor.Red);
-                Console.ReadKey();
-                PushToStack(Run);
+                HandleInterrupt(StdinService.ReadKey());
                 Run();
             } 
             else
@@ -97,25 +109,26 @@ internal class ConsoleApp
             else if (interrupt == Interrupt.Back)
             {
                 MemoryStorage.Instance.CurrentSessionToken = Guid.Empty;
-                PushToStack(Run);
                 Run();
             }
             else
             {
                 StdinService.Decorate("Login failed", ConsoleColor.Red);
                 MemoryStorage.Instance.CurrentSessionToken = Guid.Empty;
-                Console.ReadKey();
-                PushToStack(Run);
+                HandleInterrupt(StdinService.ReadKey());
                 Run();
             }
         }
 
-        PushToStack(MainMenu);
-        MainMenu();
+        Thread.Sleep(333);
+        MainMenu(true);
     }
 
-    internal void Register()
+    internal void Register(bool save=false)
     {
+        if (save)
+            PushToStack(() => Register());
+
         string option;
         Interrupt interrupt;
 
@@ -130,58 +143,117 @@ internal class ConsoleApp
         {
             Console.Write("Choose an option: ");
             interrupt = StdinService.ReadInputWithShortcut(out option);
-        } while (interrupt == Interrupt.Empty);
-        HandleInterrupt(interrupt); 
+            if (interrupt == Interrupt.Empty)
+                continue;
+            HandleInterrupt(interrupt);
+        } while (!int.TryParse(option, out _));
 
         switch (option)
         {
             case "1":
-                PushToStack(RegisterDoctor);
-                RegisterDoctor();
+                RegisterDoctor(true);
                 break;
             case "2":
-                PushToStack(RegisterAssistant);
-                RegisterAssistant();
+                RegisterAssistant(true);
                 break;
             default:
                 StdinService.Decorate("Invalid option", ConsoleColor.DarkYellow);
-                Console.ReadKey();
+                HandleInterrupt(StdinService.ReadKey());
                 Register();
                 break;
         }
 
-        PushToStack(Login);
-        Login();
+        Login(force: true);
     }
 
-    internal void MainMenu()
+    internal void SwitchSession(bool save=false)
     {
+        if (save)
+            PushToStack(() => SwitchSession());
+
+        string option;
+        Interrupt interrupt;
         Session? session = Session.GetCurrentSession();
-        if (session is null || session.IsLoggedIn == false)
+        
+        Console.Clear();
+        StdinService.Decorate("Switch User", ConsoleColor.White, ConsoleColor.DarkBlue, position: Position.Center, end: "\n\n");
+
+        List<Session> sessions = MemoryStorage.Instance.Sessions;
+        if (sessions.Count == 0)
+        {
+            StdinService.Decorate("No Sessions Found", ConsoleColor.Red);
+            HandleInterrupt(StdinService.ReadKey());
+            Login();
+        }
+        else
+        {
+            StdinService.Decorate($"   {Session.HeadView()}", ConsoleColor.DarkBlue);
+            for (int i = 0; i < sessions.Count; i++)
+            {
+                Console.WriteLine($"{i+1, -2}  {sessions[i].View()}");
+            }
+
+            Console.WriteLine("\n\n");
+            do
+            {
+                Console.Write("Enter session number to switch or (+) to add other user: ");
+                interrupt = StdinService.ReadInputWithShortcut(out option);
+                if (interrupt == Interrupt.Empty)
+                    continue;
+                if (option == "+")
+                {
+                    Login(true);
+                    return;
+                }
+                HandleInterrupt(interrupt);
+            } while (!int.TryParse(option, out _) || int.Parse(option) > sessions.Count || int.Parse(option) < 1);
+
+            if (session is not null)
+                session.Logout();
+            session = sessions[int.Parse(option) - 1];
+            if (session.Login(out interrupt))
+                StdinService.Decorate("Session switched", ConsoleColor.DarkGreen);
+            else
+            {
+                StdinService.Decorate("Failed to switch session", ConsoleColor.Red);
+                HandleInterrupt(StdinService.ReadKey());
+                MemoryStorage.Instance.CurrentSessionToken = Guid.Empty;
+                Login(true);
+            }
+            
+            Thread.Sleep(555);
+            ReturnHome(true);
+        }
+    }
+    internal void MainMenu(bool save=false)
+    {
+        if (save)
+            PushToStack(() => MainMenu());
+
+        Session? session = Session.GetCurrentSession();
+        if (session is null || !Authorizer.checkAuthorized(session))
             Login();
         else
         {
-            if (Authorizer.checkAuthorized(session))
+            session.UpdateLastLogin();
+            switch (session.Role)
             {
-                if (session.Role == Role.Doctor)
-                {
-                    PushToStack(DoctorMenu);
+                case Role.Doctor:
                     DoctorMenu();
-                }
-                else
-                {
-                    PushToStack(AssisstantMenu);
+                    break;
+                case Role.Assistant:
                     AssisstantMenu();
-                }
+                    break;
             }
-            else
-                Login();
         }
         MainMenu();
     }
 
-    internal void RegisterDoctor()
+    internal void RegisterDoctor(bool save=false)
     {
+        if (save)
+            PushToStack(() => RegisterDoctor());
+
         Console.Clear();
         StdinService.Decorate("Register Doctor Screen", ConsoleColor.White, ConsoleColor.DarkBlue, position: Position.Center, end: "\n\n");
 
@@ -189,24 +261,16 @@ internal class ConsoleApp
         MemoryStorage.Instance.AddDoctor(doctor);
     }
 
-    internal void RegisterAssistant()
+    internal void RegisterAssistant(bool save=false)
     {
+        if (save)
+            PushToStack(() => RegisterAssistant());
+
         Console.Clear();
         StdinService.Decorate("Register Assistant Screen", ConsoleColor.White, ConsoleColor.DarkBlue, position: Position.Center, end: "\n\n");
 
         Assistant assistant = ReadAssistant();
         MemoryStorage.Instance.AddAssistant(assistant);
-    }
-
-    internal void ReturnToMenu()
-    {
-        Session? session = Session.GetCurrentSession();
-            if (session is null)
-                Login();
-            if (session!.Role == Role.Doctor)
-                DoctorMenu();
-            else
-                AssisstantMenu();
     }
 
     internal void DoctorMenu()
@@ -215,51 +279,60 @@ internal class ConsoleApp
         Interrupt interrupt;
 
         Session? session = Session.GetCurrentSession();
-        if (session is null || session.IsLoggedIn == false)
+        if (session is null || !Authorizer.checkAuthorized(session))
             Login();
 
         Console.Clear();
         StdinService.Decorate("Doctor Menu", ConsoleColor.White, ConsoleColor.DarkBlue, position: Position.Center, end: "");
         StdinService.Decorate(session!.Account.Username, ConsoleColor.White, ConsoleColor.DarkMagenta, position: Position.Right, end: "\n\n");
 
-        Console.WriteLine("1. View appointments");
-        Console.WriteLine("2. Approve appointment");
-        Console.WriteLine("3. Remove appointment");
-        Console.WriteLine("4. View Profile");
-        Console.WriteLine("5. Logout");
+        Console.WriteLine("1. View Schedule");
+        Console.WriteLine("2. View Patient");
+        Console.WriteLine("3. View appointments");
+        Console.WriteLine("4. Approve appointment");
+        Console.WriteLine("5. Remove appointment");
+        Console.WriteLine("6. View Profile");
+        Console.WriteLine("7. Switch User");
+        Console.WriteLine("8. Logout");
 
         do
         {
             Console.Write("Choose an option: ");
             interrupt = StdinService.ReadInputWithShortcut(out option);
-        } while (interrupt == Interrupt.Empty);
-        HandleInterrupt(interrupt);
+            if (interrupt == Interrupt.Empty)
+                continue;
+            HandleInterrupt(interrupt);
+        } while (!int.TryParse(option, out _));
 
         switch (option)
         {
             case "1":
-                PushToStack(ViewAppointments);
-                ViewAppointments();
+                ViewSchedule(true);
                 break;
             case "2":
-                PushToStack(ApproveAppointment);
-                ApproveAppointment();
+                ViewPatient(save: true);
                 break;
             case "3":
-                PushToStack(RemoveAppointment);
-                RemoveAppointment();
+                ViewAppointments(true);
                 break;
             case "4":
-                PushToStack(ViewProfile);
-                ViewProfile();
+                ApproveAppointment(true);
                 break;
             case "5":
+                RemoveAppointment(true);
+                break;
+            case "6":
+                ViewProfile(true);
+                break;
+            case "7":
+                SwitchSession(true);
+                break;
+            case "8":
                 session?.Logout(full: true);
-                PushToStack(Run);
-                Run();
+                Run(true);
                 break;
             default:
-                Console.WriteLine("Invalid option!");
+                StdinService.Decorate("Invalid option", ConsoleColor.DarkYellow);
                 DoctorMenu();
                 break;
         }
@@ -271,7 +344,7 @@ internal class ConsoleApp
         Interrupt interrupt;
 
         Session? session = Session.GetCurrentSession();
-        if (session is null || session.IsLoggedIn == false)
+        if (session is null || !Authorizer.checkAuthorized(session))
             Login();
 
         Console.Clear();
@@ -284,56 +357,117 @@ internal class ConsoleApp
         Console.WriteLine("4. Register Patient");
         Console.WriteLine("5. View Patient");
         Console.WriteLine("6. View Profile");
-        Console.WriteLine("7. Logout");
+        Console.WriteLine("7. Switch User");
+        Console.WriteLine("8. Logout");
 
         do
         {
             Console.Write("Choose an option: ");
             interrupt = StdinService.ReadInputWithShortcut(out option);
-        } while (interrupt == Interrupt.Empty);
-        HandleInterrupt(interrupt);
+            if (interrupt == Interrupt.Empty)
+                continue;
+            HandleInterrupt(interrupt);
+        } while (!int.TryParse(option, out _));
 
         switch (option)
         {
             case "1":
-                PushToStack(ViewAppointments);
-                ViewAppointments();
+                ViewAppointments(true);
                 break;
             case "2":
-                PushToStack(AddAppointment);
-                AddAppointment();
+                AddAppointment(true);
                 break;
             case "3":
-                PushToStack(RemoveAppointment);
-                RemoveAppointment();
+                RemoveAppointment(true);
                 break;
             case "4":
-                PushToStack(RegisterPatient);
-                RegisterPatient();
+                RegisterPatient(true);
                 break;
             case "5":
-                ViewPatient();
+                ViewPatient(save: true);
                 break;
             case "6":
-                PushToStack(ViewProfile);
-                ViewProfile();
+                ViewProfile(true);
                 break;
             case "7":
+                SwitchSession(true);
+                break;
+            case "8":
                 session?.Logout(full: true);
-                PushToStack(Run);
-                Run();
+                Run(true);
                 break;
             default:
-                Console.WriteLine("Invalid option!");
+                StdinService.Decorate("Invalid option", ConsoleColor.DarkYellow);
                 AssisstantMenu();
                 break;
         }
     }
 
-    internal void ViewAppointments()
+    internal void ViewSchedule(bool save=false)
     {
+        if (save)
+            PushToStack(() => ViewSchedule());
+        
         Session? session = Session.GetCurrentSession();
-        if (session is null || session.IsLoggedIn == false)
+        if (session is null || !Authorizer.checkAuthorized(session))
+            Login();
+        
+        Doctor doctor = session!.Account as Doctor ?? throw new Exception("Session account is not a Doctor.");
+
+        Console.Clear();
+        StdinService.Decorate($"Schedule ({doctor.Shift})", ConsoleColor.White, ConsoleColor.DarkBlue, position: Position.Center, end: "");
+        StdinService.Decorate(session.Account.Username, ConsoleColor.White, ConsoleColor.DarkMagenta, position: Position.Right, end: "\n\n");
+
+        for (int i = 0; i < 7; i++)
+        {
+            DateOnly date = DateOnly.FromDateTime(DateTime.Now.Date.AddDays(i));
+            string day = "";
+            switch (i)
+            {
+                case 0:
+                    day = "Today";
+                    break;
+                case 1:
+                    day = "Tomorrow";
+                    break;
+                default:
+                    day = date.DayOfWeek.ToString();
+                    break;
+            }
+            List<Appoiment> schedules = doctor.GetSchedules(date);
+            StdinService.Decorate($"{day, -20} | ", ConsoleColor.DarkBlue, end: "");
+            int StartPoint = Console.CursorLeft;
+            foreach (Appoiment appoiment in schedules)
+            {
+                Console.CursorLeft = StartPoint;
+                StdinService.Decorate("*", ConsoleColor.DarkMagenta, end: "");
+                ConsoleColor? color = appoiment.State switch
+                {
+                    AppoimentState.Approved => ConsoleColor.White,
+                    AppoimentState.Pending => ConsoleColor.DarkGray,
+                    AppoimentState.Canceled => ConsoleColor.Red,
+                    _ => null
+                };
+                StdinService.Decorate($"{appoiment.Time.ToString("hh:mm tt")} - {appoiment.Patient.Name} - {appoiment.Patient.Number}", color);
+            }
+            if (schedules.Count == 0)
+                Console.WriteLine("No Appoiments");
+            if (i < 6)
+                StdinService.Decorate("".PadRight(Console.WindowWidth - 1, '='), ConsoleColor.DarkGray);
+        }
+
+        Console.SetCursorPosition(0, Console.WindowHeight - 1);
+        Console.Write("Press any key to return to the menu ");
+        HandleInterrupt(StdinService.ReadKey());
+        MainMenu(true);
+    }
+    internal void ViewAppointments(bool save=false)
+    {
+        if (save)
+            PushToStack(() => ViewAppointments());
+
+        Session? session = Session.GetCurrentSession();
+        if (session is null || !Authorizer.checkAuthorized(session))
             Login();
 
         Console.Clear();
@@ -351,17 +485,20 @@ internal class ConsoleApp
         // TODO: Add a way to view a single appointment
         Console.SetCursorPosition(0, Console.WindowHeight - 1);
         Console.Write("Press any key to return to the menu ");
-        Console.ReadKey();
-        ReturnToMenu();
+        HandleInterrupt(StdinService.ReadKey());
+        MainMenu(true);
     }
 
-    internal void ApproveAppointment()
+    internal void ApproveAppointment(bool save=false)
     {
+        if (save)
+            PushToStack(() => ApproveAppointment());
+
         string option;
         Interrupt interrupt;
 
         Session? session = Session.GetCurrentSession();
-        if (session is null || session.IsLoggedIn == false)
+        if (session is null || !Authorizer.checkAuthorized(session))
             Login();
 
         Console.Clear();
@@ -374,22 +511,29 @@ internal class ConsoleApp
         {
             Console.Write("Enter appointment number to approve: ");
             interrupt = StdinService.ReadInputWithShortcut(out option);
-        } while (interrupt == Interrupt.Empty);
-        HandleInterrupt(interrupt);
+            if (interrupt == Interrupt.Empty)
+                continue;
+            HandleInterrupt(interrupt);
+        } while (!int.TryParse(option, out _) || int.Parse(option) > MemoryStorage.Instance.Appoiments.Count || int.Parse(option) < 1);
 
         int idx = int.Parse(option) - 1;
         Appoiment appoiment = MemoryStorage.Instance.Appoiments[idx];
+
         appoiment.State = AppoimentState.Approved;
+
         ApproveAppointment();
     }
 
-    internal void RemoveAppointment()
+    internal void RemoveAppointment(bool save=false)
     {
+        if (save)
+            PushToStack(() => RemoveAppointment());
+
         string option;
         Interrupt interrupt;
 
         Session? session = Session.GetCurrentSession();
-        if (session is null || session.IsLoggedIn == false)
+        if (session is null || !Authorizer.checkAuthorized(session))
             Login();
 
         Console.Clear();
@@ -403,21 +547,29 @@ internal class ConsoleApp
         {
             Console.Write("Enter appointment number to remove: ");
             interrupt = StdinService.ReadInputWithShortcut(out option);
-        } while (interrupt == Interrupt.Empty);
-        HandleInterrupt(interrupt);
+            if (interrupt == Interrupt.Empty)
+                continue;
+            HandleInterrupt(interrupt);
+        } while (!int.TryParse(option, out _) || int.Parse(option) > MemoryStorage.Instance.Appoiments.Count || int.Parse(option) < 1);
 
         int idx = int.Parse(option) - 1;
         Appoiment appoiment = MemoryStorage.Instance.Appoiments[idx];
-        appoiment.State = AppoimentState.Cancelled;
+
+        appoiment.State = AppoimentState.Canceled;
+        
+        RemoveAppointment();
     }
 
-    internal void AddAppointment()
+    internal void AddAppointment(bool save=false)
     {
+        if (save)
+            PushToStack(() => AddAppointment());
+
         string option;
         Interrupt interrupt;
 
         Session? session = Session.GetCurrentSession();
-        if (session is null || session.IsLoggedIn == false)
+        if (session is null || !Authorizer.checkAuthorized(session))
             Login();
 
         Console.Clear();
@@ -437,6 +589,8 @@ internal class ConsoleApp
             StdinService.Decorate("Patient profile created", ConsoleColor.DarkGreen, position: Position.Left, end: "\n\n");
         }
 
+        StdinService.Decorate($"{doctor.DisplayInfo()}", ConsoleColor.DarkMagenta, position: Position.Right, end: "\n\n");
+
         DateTime time;
         int attempts = 0;
         do
@@ -453,8 +607,8 @@ internal class ConsoleApp
         {
             Console.WriteLine();
             StdinService.Decorate("Failed to add appointment", ConsoleColor.Red);
-            Console.ReadKey();
-            ReturnToMenu();
+            HandleInterrupt(StdinService.ReadKey());
+            MainMenu(true);
         }
         HandleInterrupt(interrupt);
 
@@ -471,27 +625,24 @@ internal class ConsoleApp
             option = Console.ReadLine()!.ToLower();
         } while (option != "y" && option != "n");
         if (option == "n")
-            StdinService.Decorate("Appointment Cancelled", ConsoleColor.Red);
+            StdinService.Decorate("Appointment Canceled", ConsoleColor.Red);
         else
         {
             MemoryStorage.Instance.AddAppoiment(appoiment);
             StdinService.Decorate("Appointment Added", ConsoleColor.DarkGreen);
         }
-        Console.ReadKey();
+        HandleInterrupt(StdinService.ReadKey());
         if (option == "n")
-        {
-            PushToStack(ReturnToMenu);
-            ReturnToMenu();
-        }
+            MainMenu(true);
         else
-        {
-            PushToStack(ViewAppointments);
-            ViewAppointments();
-        }
+            ViewAppointments(true);
     }
 
-    internal void RegisterPatient()
+    internal void RegisterPatient(bool save=false)
     {
+        if (save)
+            PushToStack(() => RegisterPatient());
+
         Console.Clear();
         StdinService.Decorate("Register Patient", ConsoleColor.White, ConsoleColor.DarkBlue, position: Position.Center, end: "\n\n");
 
@@ -505,13 +656,15 @@ internal class ConsoleApp
         else
             StdinService.Decorate("Patient already exists", background: ConsoleColor.Red, position: Position.Center);
         
-        Console.ReadKey();
-        ViewPatient(patient);
+        HandleInterrupt(StdinService.ReadKey());
+        ViewPatient(patient, true);
     }
 
-    internal void ViewPatient(Patient? patient=null)
+    internal void ViewPatient(Patient? patient=null, bool save=false)
     {
-        Interrupt interrupt;
+        if (save)
+            PushToStack(() => ViewPatient());
+
 
         Console.Clear();
         StdinService.Decorate("View Patient", ConsoleColor.White, ConsoleColor.DarkBlue, position: Position.Center, end: "\n\n");
@@ -522,8 +675,8 @@ internal class ConsoleApp
         }
         if (patient is null)
         {
-            StdinService.Decorate("Patient not found", background: ConsoleColor.Red);
-            Console.ReadKey();
+            StdinService.Decorate("Patient not found", ConsoleColor.White, ConsoleColor.Red);
+            HandleInterrupt(StdinService.ReadKey());
             ViewPatient();
         }
         else
@@ -544,26 +697,24 @@ internal class ConsoleApp
             Console.WriteLine(patient.Gendre);
 
             StdinService.Decorate("History: ", ConsoleColor.DarkBlue, end: "\n");
-            foreach (var appoiment in patient.History)
-                Console.WriteLine($"\t{ViewAppointment(appoiment)}");
+            foreach (Appoiment appoiment in patient.History)
+                Console.WriteLine($"\t{appoiment.View()}");
 
-            do
-            {
-                interrupt = StdinService.ReadInputWithShortcut(out _, true);
-            } while (interrupt != Interrupt.Back);
-            HandleInterrupt(interrupt);
 
             Console.SetCursorPosition(0, Console.WindowHeight - 1);
             Console.Write("Press any key to return to the menu ");
-            Console.ReadKey();
-            ReturnToMenu();
+            HandleInterrupt(StdinService.ReadKey());
+            MainMenu(true);
         }
     }
 
-    internal void ViewProfile()
+    internal void ViewProfile(bool save=false)
     {
+        if (save)
+            PushToStack(() => ViewProfile());
+
         Session? session = Session.GetCurrentSession();
-        if (session is null || session.IsLoggedIn == false)
+        if (session is null || !Authorizer.checkAuthorized(session))
             Login();
 
         Console.Clear();
@@ -605,9 +756,17 @@ internal class ConsoleApp
 
         Console.SetCursorPosition(0, Console.WindowHeight - 1);
         Console.Write("Press any key to return to the menu ");
-        Console.ReadKey();
-        PushToStack(ReturnToMenu);
-        ReturnToMenu();
+        HandleInterrupt(StdinService.ReadKey());
+        MainMenu(true);
+    }
+    
+    internal void ReturnHome(bool save=false)
+    {
+        Session? session = Session.GetCurrentSession();
+        if (session is null || !Authorizer.checkAuthorized(session))
+            Run(save);
+        else
+            MainMenu(save);
     }
     internal Patient? ChoosePatient(out string number)
     {
@@ -634,15 +793,16 @@ internal class ConsoleApp
         {
             Console.Write("Choose a department: ");
             interrupt = StdinService.ReadInputWithShortcut(out option);
-            if (interrupt == Interrupt.Back)
-                break;
-        } while (interrupt == Interrupt.Empty || option == "" || !Enum.IsDefined(typeof(Department), int.Parse(option)));
-        HandleInterrupt(interrupt);
+            if (interrupt == Interrupt.Empty)
+                continue;
+            HandleInterrupt(interrupt);
+        } while (!int.TryParse(option, out _) || !Enum.IsDefined(typeof(Department), int.Parse(option)));
 
         int departmentIdx = int.Parse(option);
         Department department = (Department)departmentIdx;
         return department;
     }
+    
     internal Doctor ChooseDoctor(Department? department=null)
     {
         string option;
@@ -652,17 +812,17 @@ internal class ConsoleApp
         if (map.Count == 0)
         {
             StdinService.Decorate("No Doctors Found", ConsoleColor.Red);
-            Console.ReadKey();
+            HandleInterrupt(StdinService.ReadKey());
             HandleInterrupt(Interrupt.Back);
         }
         do
         {
             Console.Write("Choose a doctor: ");
             interrupt = StdinService.ReadInputWithShortcut(out option);
-            if (interrupt == Interrupt.Back)
-                break;
-        } while (interrupt == Interrupt.Empty || !map.ContainsKey(int.Parse(option)));
-        HandleInterrupt(interrupt);
+            if (interrupt == Interrupt.Empty)
+                continue;
+            HandleInterrupt(interrupt);
+        } while (!int.TryParse(option, out _) || !map.ContainsKey(int.Parse(option)));
 
         Doctor doctor = map[int.Parse(option)];
         return doctor;
@@ -684,7 +844,6 @@ internal class ConsoleApp
         {
             Console.WriteLine($"{(int)depart} - {depart}");
         }
-
     }
 
     internal Dictionary<int, Doctor> ListDoctors(Department? department=null)
@@ -718,10 +877,10 @@ internal class ConsoleApp
             if (allAppoiments.Count == 0)
                 Console.WriteLine("No Appoiments Found");
             else
-                Console.WriteLine($"{"Time",-20} {"Patient",-20} {"State",-20} {"Paid",-20} {"Price",-20}");
+                StdinService.Decorate($"   {Appoiment.HeadView()}", ConsoleColor.DarkBlue);
             for (int i = 0; i < allAppoiments.Count; i++)
             {
-                Console.WriteLine($"{i+1}. {ViewAppointment(allAppoiments[i])}");
+                Console.WriteLine($"{i+1, -2}  {allAppoiments[i].View()}");
             }
         }
         else
@@ -730,17 +889,12 @@ internal class ConsoleApp
             if (appoiments.Count == 0)
                 Console.WriteLine("No Appoiments Found");
             else
-                Console.WriteLine($"{"Time",-20} {"Patient",-20} {"State",-20} {"Paid",-20} {"Price",-20}");
+                StdinService.Decorate($"   {Appoiment.HeadView()}", ConsoleColor.DarkBlue);
             for (int i = 0; i < appoiments.Count; i++)
             {
-                Console.WriteLine($"{i+1}. {ViewAppointment(appoiments[i])}");
+                Console.WriteLine($"{i+1, -2}  {appoiments[i].View()}");
             }
         }
-    }
-
-    internal string ViewAppointment(Appoiment appoiment)
-    {
-        return $"{appoiment.Time} - {appoiment.Patient.Name} - {appoiment.State} - {appoiment.AppoimentIsPaid} - {appoiment.Price}";
     }
 
     internal bool ValidTime(DateTime time, Doctor doctor)
@@ -780,13 +934,13 @@ internal class ConsoleApp
                 if (Actions.Count > 0)
                     Actions.Peek().Invoke();
                 else
-                    Run();
+                    ReturnHome(true);
                 break;
             case Interrupt.Back:
                 if (Actions.Count > 0)
                     PopFromStack(true);
                 else
-                    Run();
+                    ReturnHome(true);
                 break;
             case Interrupt.Exit:
                 Environment.Exit(0);
@@ -867,13 +1021,13 @@ internal class ConsoleApp
         {
             Console.WriteLine("Select your shift:");
             interrupt = StdinService.ReadInputWithShortcut(out option);
-            if (interrupt == Interrupt.Back)
-                break;
-        } while (interrupt == Interrupt.Empty || !Enum.IsDefined(typeof(Shift), int.Parse(option)));
-        HandleInterrupt(interrupt);
+            if (interrupt == Interrupt.Empty)
+                continue;
+            HandleInterrupt(interrupt);
+        } while (!int.TryParse(option, out _) || !Enum.IsDefined(typeof(Shift), int.Parse(option)));
         Shift shift = (Shift)int.Parse(option);
 
-        return new Account(username, password, name, email, number, Shift.Morning);
+        return new Account(username, password, name, email, number, shift);
     }
     internal Doctor ReadDoctor()
     {
@@ -889,10 +1043,11 @@ internal class ConsoleApp
         {
             Console.WriteLine("Select your department:");
             interrupt = StdinService.ReadInputWithShortcut(out option);
-            if (interrupt == Interrupt.Back)
-                break;
-        } while (interrupt == Interrupt.Empty || !Enum.IsDefined(typeof(Department), int.Parse(option)));
-        HandleInterrupt(interrupt);
+            if (interrupt == Interrupt.Empty)
+                continue;
+            HandleInterrupt(interrupt);
+        } while (!int.TryParse(option, out _) || !Enum.IsDefined(typeof(Department), int.Parse(option)));
+
         Department department = (Department)int.Parse(option);
 
         foreach (var day in Enum.GetValues(typeof(DayOfWeek)))
@@ -972,10 +1127,10 @@ internal class ConsoleApp
         {
             Console.Write("Select your gender: ");
             interrupt = StdinService.ReadInputWithShortcut(out option);
-            if (interrupt == Interrupt.Back)
-                break;
-        } while (interrupt == Interrupt.Empty || !Enum.IsDefined(typeof(Gendre), int.Parse(option)));
-        HandleInterrupt(interrupt);
+            if (interrupt == Interrupt.Empty)
+                continue;
+            HandleInterrupt(interrupt);
+        } while (!int.TryParse(option, out _) || !Enum.IsDefined(typeof(Gendre), int.Parse(option)));
 
         return new Patient(name, number, address, int.Parse(age), (Gendre)int.Parse(option));
     }
@@ -996,6 +1151,8 @@ internal class ConsoleApp
         if (Actions.Count > 0)
             Actions.Peek().Invoke();
         else
-            Run();
+        {
+            ReturnHome(true);
+        }
     }
 }
