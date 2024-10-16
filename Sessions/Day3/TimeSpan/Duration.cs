@@ -22,10 +22,6 @@ public class Duration
 
         Seconds -= seconds;
     }
-    public string getstring()
-    {
-        return $"Hours: {Hours}, Minutes :{Minutes} , Seconds :{Seconds}";
-    }
 
     public override string ToString()
     {
