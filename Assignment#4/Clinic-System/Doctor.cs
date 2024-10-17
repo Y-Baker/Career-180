@@ -77,20 +77,44 @@ public class Doctor : Account
             case Shift.Morning:
                 start = MemoryStorage.Instance.WorkingHours[Shift.Morning].Item1;
                 end = MemoryStorage.Instance.WorkingHours[Shift.Morning].Item2;
-                if (time.TimeOfDay < start || time.TimeOfDay >= end)
-                    return false;
+                if (end < start)
+                {
+                    if (time.TimeOfDay > end && time.TimeOfDay < start)
+                        return false;
+                }
+                else
+                {
+                    if (time.TimeOfDay < start || time.TimeOfDay > end)
+                        return false;
+                }
                 break;
             case Shift.Evening:
                 start = MemoryStorage.Instance.WorkingHours[Shift.Evening].Item1;
                 end = MemoryStorage.Instance.WorkingHours[Shift.Evening].Item2;
-                if (time.TimeOfDay < start || time.TimeOfDay >= end)
-                    return false;
+                if (end < start)
+                {
+                    if (time.TimeOfDay > end && time.TimeOfDay < start)
+                        return false;
+                }
+                else
+                {
+                    if (time.TimeOfDay < start || time.TimeOfDay > end)
+                        return false;
+                }
                 break;
             case Shift.Night:
                 start = MemoryStorage.Instance.WorkingHours[Shift.Night].Item1;
                 end = MemoryStorage.Instance.WorkingHours[Shift.Night].Item2;
-                if (time.TimeOfDay < start || time.TimeOfDay >= end)
-                    return false;
+                if (end < start)
+                {
+                    if (time.TimeOfDay > end && time.TimeOfDay < start)
+                        return false;
+                }
+                else
+                {
+                    if (time.TimeOfDay < start || time.TimeOfDay > end)
+                        return false;
+                }
                 break;
         }
         return true;

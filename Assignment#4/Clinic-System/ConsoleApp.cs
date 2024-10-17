@@ -1019,7 +1019,7 @@ internal class ConsoleApp
         }
         do
         {
-            Console.WriteLine("Select your shift:");
+            Console.Write("Select your shift:");
             interrupt = StdinService.ReadInputWithShortcut(out option);
             if (interrupt == Interrupt.Empty)
                 continue;
@@ -1041,7 +1041,7 @@ internal class ConsoleApp
         }
         do
         {
-            Console.WriteLine("Select your department:");
+            Console.Write("Select your department:");
             interrupt = StdinService.ReadInputWithShortcut(out option);
             if (interrupt == Interrupt.Empty)
                 continue;
