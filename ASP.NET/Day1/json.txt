@@ -1,0 +1,20 @@
+[
+    {
+        "id": 1,
+        "name": "C#",
+        "duration": 20,
+        "status": true
+    },
+    {
+        "id": 2,
+        "name": "SQL",
+        "duration": 15,
+        "status": false
+    },
+    {
+        "id": 3,
+        "name": "ASP.NET",
+        "duration": 30,
+        "status": false
+    }
+]
