@@ -79,7 +79,8 @@ namespace WebAPI.Controllers
                 db.Courses.Add(course);
                 db.SaveChanges();
 
-                return Created($"api/courses/{course.Id}", course);
+                //return Created($"api/courses/{course.Id}", course);
+                return CreatedAtAction("getById", new { id = course.Id }, course);
             }
             return BadRequest(ModelState);
         }
