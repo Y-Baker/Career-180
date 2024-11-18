@@ -5,6 +5,7 @@ using WebApi.DTOs.Products;
 using WebApi.Models;
 using WebApi.UnitOfWorks;
 using System.IO;
+using Swashbuckle.AspNetCore.Annotations;
 
 namespace WebApi.Controllers
 {
@@ -38,6 +39,9 @@ namespace WebApi.Controllers
         }
 
 
+        [SwaggerOperation("Get All Products", "Return a list of all products in the system.")]
+        [SwaggerResponse(200, "Successfully", typeof(List<ProductDTO>))]
+        [Produces("application/json")]
         [HttpGet]
         public IActionResult GetAll()
         {
@@ -53,6 +57,10 @@ namespace WebApi.Controllers
             return Ok(productsDTO);
         }
 
+        [SwaggerOperation("Get Product By Id", "Return an specific product based on its id givin in route in the system.")]
+        [SwaggerResponse(200, "Successfully", typeof(ProductDTO))]
+        [SwaggerResponse(404, "Failed,Id Not Found")]
+        [Produces("application/json")]
         [HttpGet("{id}")]
         public IActionResult GetById(int id)
         {
@@ -64,6 +72,9 @@ namespace WebApi.Controllers
             return Ok(ProductToDTO(product));
         }
 
+        [SwaggerOperation("Get Products by Price", "Return a list of products that their price in the range givin as query (maxPrice, minPrice).")]
+        [SwaggerResponse(200, "Successfully", typeof(List<ProductDTO>))]
+        [Produces("application/json")]
         [HttpGet("price")]
         public IActionResult GetByPrice([FromQuery] int maxPrice, [FromQuery] int minPrice = 0)
         {
@@ -88,6 +99,11 @@ namespace WebApi.Controllers
             return Ok(productsDTO);
         }
 
+
+        [SwaggerOperation("Add New Product", "Add New Product given in the body to the system.")]
+        [SwaggerResponse(201, "Successfully Added", typeof(ProductDTO))]
+        [SwaggerResponse(400, "Failed")]
+        [Produces("application/json")]
         [HttpPost]
         public IActionResult AddProduct(AddProductDTO productDTO)
         {
@@ -123,6 +139,12 @@ namespace WebApi.Controllers
             return CreatedAtAction(nameof(GetById), new { id = product.Id }, productAdded);
         }
 
+
+        [SwaggerOperation("Update a Product", "Update an Existing Product given in the body to the system.")]
+        [SwaggerResponse(204, "Successfully Added")]
+        [SwaggerResponse(404, "Product Not Exists")]
+        [SwaggerResponse(400, "Failed")]
+        [Produces("application/json")]
         [HttpPut("{id}")]
         public IActionResult EditProduct(int id, EditProductDTO productDTO)
         {
@@ -165,6 +187,11 @@ namespace WebApi.Controllers
             return NoContent();
         }
 
+
+        [SwaggerOperation("Delete Product", "Delete an Existing Product by an id given in the rout from the system")]
+        [SwaggerResponse(200, "Successfully Deleted", typeof(List<ProductDTO>))]
+        [SwaggerResponse(404, "Product Not Exists")]
+        [Produces("application/json")]
         [HttpDelete("{id}")]
         public IActionResult DeleteProduct(int id)
         {
