@@ -2,13 +2,12 @@ using Microsoft.EntityFrameworkCore;
 using WebApi.Models;
 using WebApi.UnitOfWorks;
 using Microsoft.OpenApi.Models;
+using Microsoft.AspNetCore.Cors.Infrastructure;
 
+const string corsPolicy = "AllowALl";
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
-
 builder.Services.AddControllers();
-// Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddDbContext<ShopDbContext>(e => e.UseSqlServer(builder.Configuration.GetConnectionString("SQL-Server")));
 builder.Services.AddScoped<UnitOfWork>();
@@ -30,10 +29,19 @@ builder.Services.AddSwaggerGen(option =>
     option.EnableAnnotations();
 });
 
+builder.Services.AddCors(e => e.AddPolicy(corsPolicy, p =>
+{
+    p.AllowAnyOrigin();
+    p.AllowAnyMethod();
+    p.AllowAnyHeader();
+}));
+
 var app = builder.Build();
 
 app.UseSwagger();
 app.UseSwaggerUI();
+
+app.UseCors(corsPolicy);
 
 app.UseHttpsRedirection();
 
