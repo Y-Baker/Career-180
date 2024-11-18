@@ -13,7 +13,7 @@ public class Product : BaseEntity
     public int Amount { get; set; } = 0;
 
     [Column("photo")]
-    public string? PhotoPath { get; set; }
+    public string? PhotoId { get; set; }
 
     [ForeignKey("Category")]
     public int CategoryId { get; set; }

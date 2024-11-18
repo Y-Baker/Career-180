@@ -14,16 +14,24 @@ namespace WebApi.Controllers
     public class ProductsController : ControllerBase
     {
         UnitOfWork db;
-        IConfiguration configuration;
+        string uploadPath;
+        string basePath;
+        const string mediaEndPoint = $"api/media";
+        const string mimeType = "image/jpeg";
 
         public ProductsController(UnitOfWork unit, IConfiguration configuration)
         {
             db = unit;
-            this.configuration = configuration;
+            string upload = configuration.GetSection("Upload-Path").Get<string>() ?? throw new Exception("Upload Path Doesn't Exists in appsettings.json");
+
+            basePath = Directory.GetParent(AppContext.BaseDirectory)?.Parent?.Parent?.Parent?.FullName ?? throw new Exception("Error in Find Base Directory");
+            uploadPath = Path.Combine(basePath, upload);
         }
 
-        private ProductDTO ProductToDTO(Product product)
+        private ProductDTO ProductToDTO(Product product, string baseUrl)
         {
+            string photoUrl = $"{baseUrl}/{mediaEndPoint}/{product.PhotoId}";
+
             ProductDTO productDTO = new ProductDTO()
             {
                 ProductId = product.Id,
@@ -32,10 +40,41 @@ namespace WebApi.Controllers
                 Price = product.Price,
                 Amount = product.Amount,
                 CategoryName = product.Category?.Name ?? "No Category",
-                PhotoPath = product.PhotoPath
+                PhotoUri = new Uri(photoUrl)
             };
 
             return productDTO;
+        }
+        private Product ToProduct(AddProductDTO productDTO, string? id)
+        {
+            Product product = new Product()
+            {
+                Name = productDTO.ProductName,
+                Description = productDTO.Description,
+                Price = productDTO.Price,
+                Amount = productDTO.Amount,
+                CategoryId = productDTO.CategoryId,
+                Category = db.CategoryRepo.SelectById(productDTO.CategoryId),
+                PhotoId = id 
+            };
+
+            return product;
+        }
+        private Product ToProduct(EditProductDTO productDTO, string? id)
+        {
+            Product product = new Product()
+            {
+                Id = productDTO.ProductId,
+                Name = productDTO.ProductName,
+                Description = productDTO.Description,
+                Price = productDTO.Price,
+                Amount = productDTO.Amount,
+                CategoryId = productDTO.CategoryId,
+                Category = db.CategoryRepo.SelectById(productDTO.CategoryId),
+                PhotoId = id
+            };
+
+            return product;
         }
 
 
@@ -45,13 +84,15 @@ namespace WebApi.Controllers
         [HttpGet]
         public IActionResult GetAll()
         {
+            string baseUrl = $"{Request.Scheme}://{Request.Host}{Request.PathBase}";
+
             List<Product> products = db.ProductRepo.SelectAll("Category");
 
             List<ProductDTO> productsDTO = new List<ProductDTO>();
 
             foreach (Product product in products)
             {
-                productsDTO.Add(ProductToDTO(product));
+                productsDTO.Add(ProductToDTO(product, baseUrl));
             }
 
             return Ok(productsDTO);
@@ -64,13 +105,38 @@ namespace WebApi.Controllers
         [HttpGet("{id}")]
         public IActionResult GetById(int id)
         {
+            string baseUrl = $"{Request.Scheme}://{Request.Host}{Request.PathBase}";
+
             Product? product = db.ProductRepo.SelectById(id, "Category");
 
             if (product == null)
                 return NotFound();
 
-            return Ok(ProductToDTO(product));
+            return Ok(ProductToDTO(product, baseUrl));
         }
+
+
+        [SwaggerOperation("View Image Of Product", "Return a Image Based on Product Id")]
+        [SwaggerResponse(200, "Successfully", typeof(PhysicalFileResult))]
+        [SwaggerResponse(404, "Failed, Product Not Found or File Not Found.")]
+        [HttpGet("{id}/image")]
+        public IActionResult GetImgByProductId(int id)
+        {
+            Product? product = db.ProductRepo.SelectById(id, "Category");
+
+            if (product == null || product.PhotoId is null)
+                return NotFound();
+
+            string filePath = Path.Combine(uploadPath, product.PhotoId);
+
+            if (!System.IO.File.Exists(filePath))
+            {
+                return NotFound("File not found.");
+            }
+
+            return PhysicalFile(filePath, mimeType);
+        }
+
 
         [SwaggerOperation("Get Products by Price", "Return a list of products that their price in the range givin as query (maxPrice, minPrice).")]
         [SwaggerResponse(200, "Successfully", typeof(List<ProductDTO>))]
@@ -78,22 +144,15 @@ namespace WebApi.Controllers
         [HttpGet("price")]
         public IActionResult GetByPrice([FromQuery] int maxPrice, [FromQuery] int minPrice = 0)
         {
+            string baseUrl = $"{Request.Scheme}://{Request.Host}{Request.PathBase}";
+
             List<Product> products = db.ProductRepo.SelectByPrice(minPrice, maxPrice, "Category");
 
             List<ProductDTO> productsDTO = new List<ProductDTO>();
 
             foreach (Product product in products)
             {
-                productsDTO.Add(new ProductDTO()
-                {
-                    ProductId = product.Id,
-                    ProductName = product.Name,
-                    Description = product.Description,
-                    Price = product.Price,
-                    Amount = product.Amount,
-                    CategoryName = product.Category?.Name ?? "No Category",
-                    PhotoPath = product.PhotoPath
-                });
+                productsDTO.Add(ProductToDTO(product, baseUrl));
             }
 
             return Ok(productsDTO);
@@ -116,25 +175,17 @@ namespace WebApi.Controllers
             if (!ModelState.IsValid)
                 return BadRequest();
 
-            string? photoPath = null;
+            string baseUrl = $"{Request.Scheme}://{Request.Host}{Request.PathBase}";
+            string? photoId = null;
             if (productDTO.Photo is not null)
-                photoPath = AddPhoto(productDTO.Photo);
+                photoId = AddPhoto(productDTO.Photo);
 
-            Product product = new Product()
-            {
-                Name = productDTO.ProductName,
-                Description = productDTO.Description,
-                Price = productDTO.Price,
-                Amount = productDTO.Amount,
-                CategoryId = productDTO.CategoryId,
-                Category = db.CategoryRepo.SelectById(productDTO.CategoryId),
-                PhotoPath = photoPath
-            };
+            Product product = ToProduct(productDTO, photoId);
 
             db.ProductRepo.Add(product);
             db.Save();
 
-            ProductDTO productAdded = ProductToDTO(product);
+            ProductDTO productAdded = ProductToDTO(product, baseUrl);
 
             return CreatedAtAction(nameof(GetById), new { id = product.Id }, productAdded);
         }
@@ -161,25 +212,18 @@ namespace WebApi.Controllers
             if (productBefore == null)
                 return NotFound();
 
-            string? photoPath = productBefore.PhotoPath;
+            string baseUrl = $"{Request.Scheme}://{Request.Host}{Request.PathBase}";
+
+            string? photoId = productBefore.PhotoId;
+            string? newPhotoId = null;
+
             if (productDTO.Photo is not null)
             {
-                if (productBefore.PhotoPath is not null)
-                    RemovePhoto(productBefore.PhotoPath);
-                photoPath = AddPhoto(productDTO.Photo);
+                if (productBefore.PhotoId is not null)
+                    RemovePhoto(productBefore.PhotoId);
+                newPhotoId = AddPhoto(productDTO.Photo);
             }
-
-            Product product = new Product()
-            {
-                Id = productDTO.ProductId,
-                Name = productDTO.ProductName,
-                Description = productDTO.Description,
-                Price = productDTO.Price,
-                Amount = productDTO.Amount,
-                CategoryId = productDTO.CategoryId,
-                Category = db.CategoryRepo.SelectById(productDTO.CategoryId),
-                PhotoPath = photoPath
-            };
+            Product product = ToProduct(productDTO, newPhotoId ?? productBefore.PhotoId);
 
             db.ProductRepo.Update(product);
             db.Save();
@@ -207,18 +251,20 @@ namespace WebApi.Controllers
 
         string AddPhoto(IFormFile file)
         {
-            string uploadPath = configuration.GetSection("Upload-Path").Get<string>() ?? throw new Exception("Upload Path Doesn't Exists in appsettings.json");
-            string directoryPath = Path.Combine(Directory.GetCurrentDirectory(), uploadPath);
-            string path = Path.Combine(directoryPath, file.FileName);
+            Guid guid = Guid.NewGuid();
+            string fileExtension = Path.GetExtension(file.FileName);
+            string fileName = $"{guid.ToString()}{fileExtension}";
+            string path = Path.Combine(uploadPath, fileName);
 
             FileStream st = new(path, FileMode.Create, FileAccess.Write);
             file.CopyTo(st);
 
-            return path;
+            return fileName;
         }
 
-        void RemovePhoto(string path)
+        void RemovePhoto(string id)
         {
+            string path = Path.Combine(uploadPath, id.ToString());
             if (path is not null && System.IO.File.Exists(path))
                 System.IO.File.Delete(path);
         }

@@ -10,5 +10,5 @@ public class ProductDTO
     public double Price { get; set; }
     public int Amount { get; set; } = 0;
     public string? CategoryName { get; set; }
-    public string? PhotoPath { get; set; } //TODO: make it url which access the photo by it
+    public Uri? PhotoUri { get; set; }
 }
