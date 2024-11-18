@@ -18,7 +18,7 @@ public class Account
             return _password;
         }
     }
-    public Account(string username, string password, string name, string email, string number, Shift shift)
+    public Account(string username, string password, string? name, string email, string? number, Shift shift)
     {
         Id = Guid.NewGuid();
         Name = name;

@@ -6,7 +6,7 @@ public class Doctor : Account
     public Auth Auth { get; set; }
     public HashSet<DayOfWeek> WorkingDays { get; set; }
 
-    public Doctor(string username, string password, string name, string email, string number, Department department, HashSet<DayOfWeek>? workingDays=null, Auth auth=Auth.Partial, Shift shift=Shift.Morning)
+    public Doctor(string username, string password, string? name, string email, string? number, Department department, HashSet<DayOfWeek>? workingDays=null, Auth auth=Auth.Partial, Shift shift=Shift.Morning)
         : base(username, password, name, email, number, shift)
     {
         Department = department;
